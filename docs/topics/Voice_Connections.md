@@ -1,23 +1,42 @@
-# Voice
+# Voice API
 
-Voice connections operate in a similar fashion to the [Gateway](#DOCS_GATEWAY/gateways) connection, however they operate on a different set of payloads, and utilize a separate UDP-based connection for voice data transmission. Because UDP is utilized for both the receiving and transmitting of voice, your client _must_ be able to receive UDP packets, even through a firewall or NAT (see [UDP Hole Punching](https://en.wikipedia.org/wiki/UDP_hole_punching) for more information). The Discord Voice servers implement functionality (see [IP Discovery](#DOCS_VOICE_CONNECTIONS/ip-discovery)) for discovering the local machines remote UDP IP/Port, which can assist in some network configurations.
+The Voice API consists of a [WebSocket server](#DOCS_VOICE_CONNECTIONS/voice-websocket-server) for sending an receiving events, and a [UDP server](#DOCS_VOICE_CONNECT-udp-server) for sending an receiving audio data.
 
-## Voice Payloads and Events
+Voice connections operate in a similar fashion to the [Gateway](#DOCS_GATEWAY/gateways) connection, however they operate on a different set of payloads, and utilize a separate UDP-based connection for voice data transmission. Because UDP is utilized for both the receiving and transmitting of voice, your client _must_ be able to receive UDP packets, even through a firewall or NAT (see [UDP Hole Punching](https://en.wikipedia.org/wiki/UDP_hole_punching) for more information). The Discord Voice servers implement functionality (see [IP Discovery](#DOCS_VOICE_CONNECTIONS/ip-discovery)) for discovering the local machine's remote UDP IP/Port, which can assist in some network configurations.
 
-### Voice Data Packet
+## Prerequisites
+- [Gateway](#DOCS_GATEWAY/gateways) connection
 
-The voice data packet is a payload with an [encrypted voice packet header](#DOCS_VOICE_CONNECTIONS/encrypted-voice-packet-header-structure). The rest of the bytes in the payload are encrypted Opus audio data.
+## Voice WebSocket Server
 
-###### Voice Events
+###### Voice WebSocket Server Payload Structure
+
+| Field | Type | Description | Present |
+|-------|------|-------------|-------------|
+| op | integer | opcode for the payload | Always |
+| d | mixed (object, integer) | event data | Always |
+| s | integer | sequence number, used for resuming sessions and heartbeats | Only for certain OP Codes |
+
+###### Voice WebSocket Server OP Codes
 
 | Code | Name | Description |
-|--------|----------|-----------------|
+|------|------|-------------|
 | 0 | Identify | used to begin a voice websocket connection |
 | 1 | Select Protocol | used to select the voice protocol |
 | 2 | Ready | used to complete the websocket handshake |
 | 3 | Heartbeat | used to keep the websocket connection alive |
 | 4 | Session Description | used to describe the session |
 | 5 | Speaking | used to indicate which users are speaking |
+| 6 | Heartbeat ACK | sent immediately following a client heartbeat that was received |
+| 8 | Hello | provides heartbeat interval immediately after connecting |
+
+## Voice UDP Server
+
+## Voice Payloads and Events
+
+### Voice Data Packet
+
+The voice data packet is a payload with an [encrypted voice packet header](#DOCS_VOICE_CONNECTIONS/encrypted-voice-packet-header-structure). The rest of the bytes in the payload are encrypted Opus audio data.
 
 ## Connecting to Voice
 
@@ -42,7 +61,7 @@ Once we retrieve a session_id, token, and endpoint information, we can connect a
 }
 ```
 
-The voice server should respond with an OP2 Ready payload, which informs us of our `ssrc`, the UDP port, encryption modes supported and heartbeat_interval the voice server expects. Using this information, we can finally move on to [Establishing a Voice UDP Connection](#DOCS_VOICE_CONNECTIONS/establishing-a-voice-udp-connection).
+The voice server should respond with an OP2 Ready payload, which informs us of our [`ssrc`](https://tools.ietf.org/html/rfc3550#section-8), the UDP port, encryption modes supported and heartbeat_interval the voice server expects. Using this information, we can finally move on to [Establishing a Voice UDP Connection](#DOCS_VOICE_CONNECTIONS/establishing-a-voice-udp-connection).
 
 ###### Example Voice Ready Payload
 
@@ -51,7 +70,7 @@ The voice server should respond with an OP2 Ready payload, which informs us of o
 	"ssrc": 1,
 	"port": 1234,
 	"modes": ["plain", "xsalsa20_poly1305"],
-	"heartbeat_interval": 1
+	"heartbeat_interval": 55000
 }
 ```
 
@@ -79,7 +98,7 @@ Finally, the voice server will respond with a OP4 Session Description. We can no
 
 #### IP Discovery
 
-Generally routers on the internet mask or obfuscate UDP ports through a process called NAT. Most users who implement voice will want to utilize IP discovery to find their local IP and port which will then be used for receiving voice communications. To retrieve your local IP, send a 70-byte packet with empty data past the 4-byte ssrc. The server will respond back with another 70-byte packet, this time with a NULL-terminated string of the IP, with the port encoded in a **little endian** unsigned short stored in the last two bytes of the packet.
+Generally routers on the internet mask or obfuscate UDP ports through a process called NAT. Most users who implement voice will want to utilize IP discovery to find their local IP and port which will then be used for receiving voice communications. To retrieve your local IP, send a 70-byte packet with empty data past the 4-byte [`ssrc`](https://tools.ietf.org/html/rfc3550#section-8). The server will respond back with another 70-byte packet, this time with a NULL-terminated string of the IP, with the port encoded in a **little endian** unsigned short stored in the last two bytes of the packet.
 
 ## Encrypting and Sending Voice
 
